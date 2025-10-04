@@ -73,32 +73,97 @@ def extract_text_from_pdf(pdf_path: str) -> List[Dict]:
     
     return chunks
 
+def extract_text_from_txt(txt_path: str) -> List[Dict]:
+    """Extrae texto de archivos TXT y Markdown"""
+    chunks = []
+    
+    try:
+        with open(txt_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+        
+        if not content.strip():
+            print(f"⚠️  Archivo vacío: {txt_path}")
+            return chunks
+        
+        # Limpiar contenido de markdown básico
+        import re
+        cleaned_content = re.sub(r'#{1,6}\s*', '', content)  # Remover headers #
+        cleaned_content = re.sub(r'\*\*(.*?)\*\*', r'\1', cleaned_content)  # Remover **bold**
+        cleaned_content = re.sub(r'\*(.*?)\*', r'\1', cleaned_content)  # Remover *italic*
+        cleaned_content = re.sub(r'!\[.*?\]\(.*?\)', '', cleaned_content)  # Remover imágenes
+        cleaned_content = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', cleaned_content)  # Remover links pero mantener texto
+        
+        # Dividir en párrafos naturales
+        paragraphs = [p.strip() for p in cleaned_content.split('\n\n') if p.strip()]
+        
+        for i, paragraph in enumerate(paragraphs):
+            if len(paragraph) > 100:  # Filtrar párrafos muy cortos
+                chunks.append({
+                    'content': paragraph,
+                    'doc_id': os.path.basename(txt_path),
+                    'title': os.path.basename(txt_path).replace('.txt', '').replace('.md', ''),
+                    'page': i + 1,  # Usar número de párrafo como "página"
+                    'source': txt_path,
+                    'chunk_id': f"{os.path.basename(txt_path)}_p{i+1}"
+                })
+        
+        print(f"  ✅ TXT procesado: {len(chunks)} chunks de {len(paragraphs)} párrafos")
+        return chunks
+        
+    except Exception as e:
+        print(f"❌ Error procesando TXT {txt_path}: {e}")
+        return chunks
+
 def process_documents(input_dir: str = 'data/raw', output_dir: str = 'data/processed'):
-    """Procesa todos los documentos PDF"""
+    """Procesa todos los documentos (PDF, TXT, MD)"""
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     
     all_chunks = []
     sources = []
     
-    # Procesar cada PDF
-    for pdf_file in Path(input_dir).glob('*.pdf'):
-        print(f"Procesando: {pdf_file}")
+    print("📁 BUSCANDO DOCUMENTOS...")
+    
+    # Procesar PDFs
+    pdf_files = list(Path(input_dir).glob('*.pdf'))
+    print(f"📄 PDFs encontrados: {len(pdf_files)}")
+    
+    for pdf_file in pdf_files:
+        print(f"  🔍 Procesando PDF: {pdf_file.name}")
         chunks = extract_text_from_pdf(str(pdf_file))
-        
         if chunks:
             all_chunks.extend(chunks)
-            print(f"  ✅ Extraídos {len(chunks)} chunks")
-            
-            # Registrar fuente
             sources.append({
                 'doc_id': pdf_file.name,
                 'title': pdf_file.stem,
                 'source': str(pdf_file),
                 'vigencia': '2024-2025',
-                'url': 'https://www.ufro.cl/normativa'
+                'url': 'https://www.ufro.cl/normativa',
+                'formato': 'pdf'
             })
+            print(f"    ✅ {len(chunks)} chunks extraídos")
         else:
-            print(f"  ⚠️  No se pudieron extraer chunks de {pdf_file}")
+            print(f"    ⚠️  No se pudieron extraer chunks")
+    
+    # Procesar TXT y Markdown
+    txt_files = list(Path(input_dir).glob('*.txt')) + list(Path(input_dir).glob('*.md'))
+    print(f"📝 TXT/MD encontrados: {len(txt_files)}")
+    
+    for txt_file in txt_files:
+        print(f"  🔍 Procesando TXT/MD: {txt_file.name}")
+        chunks = extract_text_from_txt(str(txt_file))
+        if chunks:
+            all_chunks.extend(chunks)
+            sources.append({
+                'doc_id': txt_file.name,
+                'title': txt_file.stem,
+                'source': str(txt_file),
+                'vigencia': '2024-2025', 
+                'url': 'https://www.ufro.cl/normativa',
+                'formato': 'txt'
+            })
+            print(f"    ✅ {len(chunks)} chunks extraídos")
+        else:
+            print(f"    ⚠️  No se pudieron extraer chunks")
     
     if all_chunks:
         # Guardar chunks
@@ -109,10 +174,14 @@ def process_documents(input_dir: str = 'data/raw', output_dir: str = 'data/proce
         df_sources = pd.DataFrame(sources)
         df_sources.to_csv(f"{output_dir}/sources.csv", index=False)
         
-        print(f"✅ Procesados {len(all_chunks)} chunks de {len(sources)} documentos")
+        print(f"\n🎉 PROCESAMIENTO COMPLETADO")
+        print(f"📊 Total chunks: {len(all_chunks)}")
+        print(f"📚 Documentos procesados: {len(sources)}")
+        print(f"📄 PDFs: {len([s for s in sources if s['formato'] == 'pdf'])}")
+        print(f"📝 TXT/MD: {len([s for s in sources if s['formato'] == 'txt'])}")
+        
     else:
         print("❌ No se pudieron procesar chunks de ningún documento")
-        # Crear chunks de ejemplo para que el sistema funcione
         create_sample_chunks(output_dir)
 
 def create_sample_chunks(output_dir: str):
