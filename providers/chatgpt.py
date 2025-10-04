@@ -12,7 +12,7 @@ print("Cargando ChatGPT Provider...:  " + str(os.getenv('OPENAI_API_KEY')))
 
 class ChatGPTProvider(Provider):
     def __init__(self):
-        self.client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        self.client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'), base_url="https://openrouter.ai/api/v1/")
         self.model = "openai/gpt-4.1-mini"
     
     def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
