@@ -540,45 +540,95 @@ def run_single_query(args):
         print(f"❌ Error: {e}")
 
 def run_batch_evaluation(args):
-    """Ejecuta evaluación batch con reporte detallado"""
+    """Ejecuta evaluación batch con manejo de errores mejorado"""
     print("📊 EJECUTANDO EVALUACIÓN BATCH...")
     
-    with open(args.batch, 'r') as f:
-        questions = [json.loads(line) for line in f]
-    
-    results = []
-    for i, q in enumerate(questions, 1):
-        print(f"🔍 Procesando {i}/{len(questions)}: {q['question'][:50]}...")
+    try:
+        # Verificar que el archivo existe
+        if not os.path.exists(args.batch):
+            print(f"❌ Archivo no encontrado: {args.batch}")
+            return
         
-        result = assistant.process_query(q['question'], args.provider, args.k)
+        with open(args.batch, 'r', encoding='utf-8') as f:
+            questions = [json.loads(line) for line in f if line.strip()]
         
-        # Evaluar calidad
-        from eval.evaluate import Evaluator
-        evaluator = Evaluator()
-        metrics = evaluator.evaluate_response(result, q)
+        if not questions:
+            print("❌ No hay preguntas en el archivo batch")
+            return
         
-        results.append({
-            'question': q['question'],
-            'expected_answer': q.get('expected_answer', ''),
-            'actual_answer': result['answer'],
-            'provider': result['provider'],
-            'citations': result['citations'],
-            'latency': result['latency'],
-            'retrieval_latency': result.get('retrieval_latency', 0),
-            'llm_latency': result.get('llm_latency', 0),
-            'exact_match': metrics['exact_match'],
-            'semantic_similarity': metrics['semantic_similarity'],
-            'citation_coverage': metrics['citation_coverage']
-        })
-    
-    # Guardar CSV detallado
-    df = pd.DataFrame(results)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"batch_results_{timestamp}.csv"
-    df.to_csv(filename, index=False, encoding='utf-8')
-    
-    # Generar reporte
-    generate_evaluation_report(df, filename)
+        print(f"🔍 Procesando {len(questions)} preguntas...")
+        
+        results = []
+        for i, q in enumerate(questions, 1):
+            print(f"  {i}/{len(questions)}: {q.get('question', '')[:50]}...")
+            
+            try:
+                result = assistant.process_query(q.get('question', ''), args.provider, args.k)
+                
+                # Evaluar calidad con manejo de errores
+                try:
+                    from eval.evaluate import Evaluator
+                    evaluator = Evaluator()
+                    metrics = evaluator.evaluate_response(result, q)
+                except Exception as e:
+                    print(f"    ⚠️  Error en evaluación: {e}")
+                    # Métricas por defecto si falla la evaluación
+                    metrics = {
+                        'exact_match': 0.0,
+                        'semantic_similarity': 0.0,
+                        'citation_coverage': 1.0 if result['citations'] else 0.0,
+                        'has_answer': len(result['answer'].strip()) > 0,
+                        'answer_length': len(result['answer'])
+                    }
+                
+                results.append({
+                    'question': q.get('question', ''),
+                    'expected_answer': q.get('expected_answer', ''),
+                    'actual_answer': result['answer'],
+                    'provider': result['provider'],
+                    'citations': ', '.join(result['citations']),
+                    'latency': result['latency'],
+                    'retrieval_latency': result.get('retrieval_latency', 0),
+                    'llm_latency': result.get('llm_latency', 0),
+                    'exact_match': metrics.get('exact_match', 0),
+                    'semantic_similarity': metrics.get('semantic_similarity', 0),
+                    'citation_coverage': metrics.get('citation_coverage', 0),
+                    'has_answer': metrics.get('has_answer', False),
+                    'answer_length': metrics.get('answer_length', 0)
+                })
+                
+            except Exception as e:
+                print(f"    ❌ Error procesando pregunta {i}: {e}")
+                # Registrar error pero continuar
+                results.append({
+                    'question': q.get('question', ''),
+                    'expected_answer': q.get('expected_answer', ''),
+                    'actual_answer': f'ERROR: {str(e)}',
+                    'provider': 'error',
+                    'citations': '',
+                    'latency': 0,
+                    'retrieval_latency': 0,
+                    'llm_latency': 0,
+                    'exact_match': 0,
+                    'semantic_similarity': 0,
+                    'citation_coverage': 0,
+                    'has_answer': False,
+                    'answer_length': 0
+                })
+        
+        # Guardar CSV
+        df = pd.DataFrame(results)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"batch_results_{timestamp}.csv"
+        df.to_csv(filename, index=False, encoding='utf-8')
+        
+        # Generar reporte
+        generate_evaluation_report(df, filename)
+        
+        print(f"✅ Evaluación completada: {filename}")
+        
+    except Exception as e:
+        print(f"❌ Error en evaluación batch: {e}")
     
     print(f"✅ Evaluación completada: {filename}")
 def show_metrics_cli():

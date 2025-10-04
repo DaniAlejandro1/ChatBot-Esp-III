@@ -1,0 +1,52 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Tabla Comparativa - UFRO Assistant</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+                .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; }
+                h2 { color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+                .table-container { overflow-x: auto; margin: 20px 0; }
+                table { width: 100%; border-collapse: collapse; background: white; }
+                th { background-color: #3498db; color: white; padding: 12px; text-align: left; }
+                td { padding: 10px; border-bottom: 1px solid #ddd; }
+                tr:nth-child(even) { background-color: #f8f9fa; }
+                tr:hover { background-color: #e8f4fd; }
+                .conclusions { background-color: #e8f6f3; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                .timestamp { text-align: right; color: #7f8c8d; font-size: 12px; margin-top: 20px; }
+                .metric-highlight { color: #27ae60; font-weight: bold; }
+                .metric-warning { color: #e74c3c; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>📊 Tabla Comparativa - UFRO Assistant</h1>
+                
+                <h2>Métricas por Proveedor</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Proveedor</th><th>Consultas</th><th>Latencia Promedio (s)</th><th>Costo Promedio (USD)</th><th>Costo Total (USD)</th><th>Tokens Promedio</th><th>Citas Promedio</th><th>Eficiencia Costo/Latencia</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>DEEPSEEK</td><td>5</td><td>5.83</td><td>$0.000102</td><td>$0.000509</td><td>105</td><td>2.4</td><td>$0.000017/s</td></tr><tr><td>CHATGPT</td><td>2</td><td>0.43</td><td>$0.000772</td><td>$0.001543</td><td>10</td><td>3.0</td><td>$0.001794/s</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h2>🔍 Hallazgos Principales</h2>
+                <div class="conclusions">
+                    • **DEEPSEEK** es 86.8% más económico por consulta<br>• **CHATGPT** es 13.6x más rápido en respuesta<br>• **CHATGPT** ofrece mejor relación costo-rendimiento general
+                </div>
+                
+                <div class="timestamp">
+                    Generado el: 2025-10-04 05:46:46
+                </div>
+            </div>
+        </body>
+        </html>
+        

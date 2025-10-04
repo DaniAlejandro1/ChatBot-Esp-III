@@ -1,124 +1,115 @@
+# eval/evaluate.py
 import json
 import time
 from typing import List, Dict
+import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
-import numpy as np
 
 class Evaluator:
     def __init__(self):
         self.model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-        self.cost_rates = {
-            'chatgpt': 0.005,  # USD por consulta promedio
-            'deepseek': 0.002  # USD por consulta promedio
-        }
     
-    def comprehensive_evaluation(self, prediction: Dict, gold: Dict) -> Dict:
-        """Evaluación completa con todas las métricas"""
-        return {
-            # Calidad de respuesta
-            'exact_match': self.exact_match(prediction['answer'], gold.get('expected_answer', '')),
-            'semantic_similarity': self.semantic_similarity(prediction['answer'], gold.get('expected_answer', '')),
-            'answer_length': len(prediction['answer'].split()),
+    def evaluate_response(self, prediction: Dict, gold: Dict) -> Dict:
+        """
+        Evalúa una respuesta comparándola con la respuesta esperada
+        
+        Args:
+            prediction: Dict con la respuesta del sistema
+            gold: Dict con la respuesta esperada y metadata
             
-            # Citas y referencias
-            'citation_coverage': self.citation_coverage(prediction['answer']),
-            'citation_accuracy': self.citation_accuracy(prediction['citations'], gold.get('expected_citations', [])),
-            'citation_count': len(prediction['citations']),
+        Returns:
+            Dict con métricas de evaluación
+        """
+        try:
+            # Métricas básicas
+            exact_match = self.exact_match(prediction['answer'], gold.get('expected_answer', ''))
+            semantic_similarity = self.semantic_similarity(prediction['answer'], gold.get('expected_answer', ''))
+            citation_coverage = self.citation_coverage(prediction['answer'])
             
-            # Rendimiento
-            'total_latency': prediction.get('latency', 0),
-            'retrieval_latency': prediction.get('retrieval_latency', 0),
-            'llm_latency': prediction.get('llm_latency', 0),
-            
-            # Costo estimado
-            'estimated_cost': self.estimate_cost(prediction.get('provider', ''), prediction['answer'])
-        }
+            return {
+                'exact_match': exact_match,
+                'semantic_similarity': semantic_similarity,
+                'citation_coverage': citation_coverage,
+                'has_answer': len(prediction['answer'].strip()) > 0,
+                'answer_length': len(prediction['answer'])
+            }
+        except Exception as e:
+            print(f"❌ Error en evaluación: {e}")
+            return {
+                'exact_match': 0.0,
+                'semantic_similarity': 0.0,
+                'citation_coverage': 0.0,
+                'has_answer': False,
+                'answer_length': 0
+            }
     
-    def estimate_cost(self, provider: str, answer: str) -> float:
-        """Estima costo basado en tokens de respuesta"""
-        if provider not in self.cost_rates:
+    def exact_match(self, pred: str, gold: str) -> float:
+        """Calcula exact match simplificado"""
+        if not pred or not gold:
             return 0.0
         
-        # Estimación simple: ~1 token por palabra
-        word_count = len(answer.split())
-        return self.cost_rates[provider] * (word_count / 500)  # Normalizado a 500 palabras
-    
-    def citation_accuracy(self, actual_citations: List[str], expected_citations: List[str]) -> float:
-        """Precisión de citas vs las esperadas"""
-        if not expected_citations:
-            return 1.0  # Si no hay citas esperadas, se considera correcto
+        pred_lower = pred.lower().strip()
+        gold_lower = gold.lower().strip()
         
-        if not actual_citations:
+        # Match parcial basado en palabras clave importantes
+        gold_words = set(gold_lower.split())
+        pred_words = set(pred_lower.split())
+        
+        if not gold_words:
+            return 0.0
+            
+        # Calcular intersección de palabras significativas
+        common_words = gold_words.intersection(pred_words)
+        return len(common_words) / len(gold_words)
+    
+    def semantic_similarity(self, pred: str, gold: str) -> float:
+        """Calcula similitud semántica usando embeddings"""
+        if not pred or not gold:
             return 0.0
         
-        # Verificar si las citas esperadas están en las actuales
-        matches = 0
-        for expected in expected_citations:
-            if any(expected.lower() in actual.lower() for actual in actual_citations):
-                matches += 1
+        try:
+            emb1 = self.model.encode([pred])
+            emb2 = self.model.encode([gold])
+            similarity = cosine_similarity(emb1, emb2)[0][0]
+            return float(similarity)
+        except Exception as e:
+            print(f"❌ Error calculando similitud semántica: {e}")
+            return 0.0
+    
+    def citation_coverage(self, response: str) -> float:
+        """Verifica si hay citas en la respuesta"""
+        import re
+        # Buscar patrones de citas [Documento, p.X] o [Documento, página X]
+        citations = re.findall(r'\[.*?[pP](?:ágina|\.)\s*\d+.*?\]', response)
+        return 1.0 if len(citations) > 0 else 0.0
+    
+    def evaluate_batch(self, predictions: List[Dict], gold_standard: List[Dict]) -> Dict:
+        """Evalúa un lote de respuestas"""
+        if len(predictions) != len(gold_standard):
+            raise ValueError("El número de predicciones y estándares dorados debe ser igual")
         
-        return matches / len(expected_citations)
-
-def generate_comparative_table(results_chatgpt: List[Dict], results_deepseek: List[Dict]) -> str:
-    """Genera tabla comparativa profesional"""
-    from tabulate import tabulate
-    
-    # Calcular métricas agregadas
-    def aggregate_metrics(results):
-        return {
-            'Exact Match': np.mean([r['exact_match'] for r in results]),
-            'Similitud Semántica': np.mean([r['semantic_similarity'] for r in results]),
-            'Cobertura Citas': np.mean([r['citation_coverage'] for r in results]),
-            'Latencia (s)': np.mean([r['total_latency'] for r in results]),
-            'Costo Promedio (USD)': np.mean([r.get('estimated_cost', 0) for r in results]),
-            'Muestras': len(results)
+        results = []
+        for pred, gold in zip(predictions, gold_standard):
+            metrics = self.evaluate_response(pred, gold)
+            results.append(metrics)
+        
+        # Métricas agregadas
+        aggregated = {
+            'num_samples': len(results),
+            'avg_exact_match': np.mean([r['exact_match'] for r in results]),
+            'avg_semantic_similarity': np.mean([r['semantic_similarity'] for r in results]),
+            'avg_citation_coverage': np.mean([r['citation_coverage'] for r in results]),
+            'answer_rate': np.mean([r['has_answer'] for r in results]),
+            'avg_answer_length': np.mean([r['answer_length'] for r in results])
         }
-    
-    gpt_metrics = aggregate_metrics(results_chatgpt)
-    ds_metrics = aggregate_metrics(results_deepseek)
-    
-    table_data = []
-    for metric in ['Exact Match', 'Similitud Semántica', 'Cobertura Citas', 'Latencia (s)', 'Costo Promedio (USD)']:
-        table_data.append([
-            metric,
-            f"{gpt_metrics[metric]:.3f}" if metric != 'Latencia (s)' else f"{gpt_metrics[metric]:.2f}",
-            f"{ds_metrics[metric]:.3f}" if metric != 'Latencia (s)' else f"{ds_metrics[metric]:.2f}",
-            f"{(ds_metrics[metric] - gpt_metrics[metric]):.3f}" if metric != 'Muestras' else ""
-        ])
-    
-    table = tabulate(table_data, 
-                    headers=['Métrica', 'ChatGPT', 'DeepSeek', 'Diferencia'],
-                    tablefmt='grid',
-                    floatfmt=".3f")
-    
-    # Hallazgos clave
-    findings = []
-    if ds_metrics['Costo Promedio (USD)'] < gpt_metrics['Costo Promedio (USD)']:
-        savings = (gpt_metrics['Costo Promedio (USD)'] - ds_metrics['Costo Promedio (USD)']) / gpt_metrics['Costo Promedio (USD)'] * 100
-        findings.append(f"• DeepSeek es {savings:.1f}% más económico que ChatGPT")
-    
-    if ds_metrics['Latencia (s)'] < gpt_metrics['Latencia (s)']:
-        findings.append(f"• DeepSeek es {gpt_metrics['Latencia (s)']/ds_metrics['Latencia (s)']:.1f}x más rápido")
-    
-    if gpt_metrics['Exact Match'] > ds_metrics['Exact Match']:
-        findings.append(f"• ChatGPT tiene mayor exactitud (+{(gpt_metrics['Exact Match']-ds_metrics['Exact Match'])*100:.1f}%)")
-    
-    report = f"""
-📊 TABLA COMPARATIVA - UFRO ASSISTANT
-{table}
+        
+        return {
+            'individual_results': results,
+            'aggregated_metrics': aggregated
+        }
 
-🔍 HALLAZGOS PRINCIPALES:
-{chr(10).join(findings)}
-
-💡 RECOMENDACIONES:
-1. Usar DeepSeek para consultas rutinarias (mejor costo/performance)
-2. Usar ChatGPT para consultas críticas (mayor exactitud)
-3. Mantener ambos proveedores para redundancia
-"""
-    
-    return report
-
+# Función helper para compatibilidad
 def evaluate_response(prediction: str, gold: str = None) -> Dict:
     """Función helper para evaluación rápida"""
     evaluator = Evaluator()
