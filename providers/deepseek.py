@@ -21,7 +21,7 @@ class DeepSeekProvider(Provider):
             )
             return response.choices[0].message.content
         except Exception as e:
-            print(f"Error en DeepSeek: {e}")
+            print(f"❌ Error en DeepSeek: {e}")
             return "Error al procesar la consulta con DeepSeek"
     
     @property
