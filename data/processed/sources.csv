@@ -1,3 +1,4 @@
-doc_id,title,source,vigencia,url
-REGLAMENTO-DE-CONVIVENCIA-UNIVERSITARIA.pdf,REGLAMENTO-DE-CONVIVENCIA-UNIVERSITARIA,data\raw\REGLAMENTO-DE-CONVIVENCIA-UNIVERSITARIA.pdf,2024-2025,https://www.ufro.cl/normativa
-ReglamentodeRegimendeEstudios__2023_.pdf,ReglamentodeRegimendeEstudios__2023_,data\raw\ReglamentodeRegimendeEstudios__2023_.pdf,2024-2025,https://www.ufro.cl/normativa
+doc_id,title,source,vigencia,url,formato
+REGLAMENTO-DE-CONVIVENCIA-UNIVERSITARIA.pdf,REGLAMENTO-DE-CONVIVENCIA-UNIVERSITARIA,data\raw\REGLAMENTO-DE-CONVIVENCIA-UNIVERSITARIA.pdf,2024-2025,https://www.ufro.cl/normativa,pdf
+ReglamentodeRegimendeEstudios__2023_.pdf,ReglamentodeRegimendeEstudios__2023_,data\raw\ReglamentodeRegimendeEstudios__2023_.pdf,2024-2025,https://www.ufro.cl/normativa,pdf
+Calendario-academico.txt,Calendario-academico,data\raw\Calendario-academico.txt,2024-2025,https://www.ufro.cl/normativa,txt
